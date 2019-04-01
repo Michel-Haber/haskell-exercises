@@ -1,13 +1,13 @@
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE GADTs          #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Exercises where
 
-import Data.Kind (Type)
+import Data.Kind (Type, Constraint)
 import Data.Function ((&))
-
-
+import Prelude
 
 
 
@@ -56,11 +56,18 @@ data Void -- No constructors!
 -- | a. If we promote this with DataKinds, can we produce any /types/ of kind
 -- 'Void'?
 
+-- No we cannot, The Void Kind has no Type-level constructors
+
 -- | b. What are the possible type-level values of kind 'Maybe Void'?
+
+-- Since in Just X X cannot be any type instance of Void, the only available
+-- type-level value for Void is Nothing
 
 -- | c. Considering 'Maybe Void', and similar examples of kinds such as
 -- 'Either Void Bool', why do you think 'Void' might be a useful kind?
 
+-- It might be useful to make some variants of types inconstructible.
+-- Either Void Bool means we can never return a Left, i.e we can never fail.
 
 
 
@@ -73,15 +80,24 @@ data Void -- No constructors!
 
 data Nat = Z | S Nat
 
-data StringAndIntList (stringCount :: Nat) where
-  -- ...
+data StringAndIntList (count :: Nat) where
+  SINil :: StringAndIntList 'Z
+  SCons :: String -> StringAndIntList n -> StringAndIntList ('S count)
+  ICons :: Int -> StringAndIntList n -> StringAndIntList n
 
 -- | b. Update it to keep track of the count of strings /and/ integers.
 
+data StringAndIntList' (scount :: Nat) (icount :: Nat) where
+  SINil' :: StringAndIntList' 'Z 'Z
+  SCons' :: String -> StringAndIntList' ns ni -> StringAndIntList' ('S ns) ni
+  ICons' :: Int -> StringAndIntList' ns ni -> StringAndIntList' ns ('S ni)
+
 -- | c. What would be the type of the 'head' function?
 
-
-
+head :: StringAndIntList' n m -> Maybe (Either String Int)
+head SINil' = Nothing
+head (SCons' s ls) = Just $ Left s
+head (ICons' i ls) = Just $ Right i
 
 
 {- FOUR -}
@@ -96,18 +112,22 @@ data Showable where
 -- stores this fact in the type-level.
 
 data MaybeShowable (isShowable :: Bool) where
-  -- ...
+  JustShowable :: (Show a) => a -> MaybeShowable 'True
+  NotShowable  :: a -> MaybeShowable 'False
 
 -- | b. Write a 'Show' instance for 'MaybeShowable'. Your instance should not
 -- work unless the type is actually 'show'able.
+
+instance Show (MaybeShowable 'True) where
+  show (JustShowable a) = show a
 
 -- | c. What if we wanted to generalise this to @Constrainable@, such that it
 -- would work for any user-supplied constraint of kind 'Constraint'? How would
 -- the type change? What would the constructor look like? Try to build this
 -- type - GHC should tell you exactly which extension you're missing.
 
-
-
+data Constrainable (c :: Type -> Constraint) where
+  Constrained :: (c x) => x -> Constrainable c
 
 
 {- FIVE -}
