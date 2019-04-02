@@ -7,7 +7,7 @@ module Exercises where
 
 import Data.Kind (Type, Constraint)
 import Data.Function ((&))
-import Prelude
+import Prelude hiding (length)
 
 
 
@@ -142,16 +142,26 @@ data List a = Nil | Cons a (List a)
 -- having a list of types!
 
 data HList (types :: List Type) where
-  -- HNil  :: ...
-  -- HCons :: ...
+  HNil  :: HList 'Nil
+  HCons :: t -> HList ts -> HList ('Cons t ts)
+
+-- Further explanation: ts is of kind "List of Type" and t is of kind "Type".
+-- As we manipulate elements, we manipulate types in parallel
+-- \Nil :k: Type
+-- 'Cons :k: Type -> (List Type) -> Type
+-- If xs were List Nat, we could not have written HCons like this
 
 -- | b. Write a well-typed, 'Maybe'-less implementation for the 'tail' function
 -- on 'HList'.
 
+tail :: HList ('Cons t ts) -> HList ts
+tail (HCons _ xs) = xs
+
 -- | c. Could we write the 'take' function? What would its type be? What would
 -- get in our way?
 
-
+-- I failed this one... Can't seem to figure it out.
+-- Start of solution
 
 
 
@@ -159,11 +169,11 @@ data HList (types :: List Type) where
 
 -- | Here's a boring data type:
 
-data BlogAction
-  = AddBlog
-  | DeleteBlog
-  | AddComment
-  | DeleteComment
+data BlogAction (auth :: Bool) where
+  AddBlog :: BlogAction 'False
+  DeleteBlog :: BlogAction 'True
+  AddComment :: BlogAction 'False
+  DeleteComment :: BlogAction 'True
 
 -- | a. Two of these actions, 'DeleteBlog' and 'DeleteComment', should be
 -- admin-only. Extend the 'BlogAction' type (perhaps with a GADT...) to
@@ -174,16 +184,15 @@ data BlogAction
 -- | b. Write a 'BlogAction' list type that requires all its members to be
 -- the same "access level": "admin" or "non-admin".
 
--- data BlogActionList (isSafe :: ???) where
---   ...
+newtype BlogActionList (auth :: Bool) = BlogActionList [BlogAction auth]
 
 -- | c. Let's imagine that our requirements change, and 'DeleteComment' is now
 -- available to a third role: moderators. Could we use 'DataKinds' to introduce
 -- the three roles at the type-level, and modify our type to keep track of
 -- this?
 
-
-
+-- Simply replace Bool with a 3 type kind. 'User | 'Admin | 'Moderator
+-- And do the appropriate changes in the contructors
 
 
 {- SEVEN -}
@@ -203,18 +212,20 @@ data SBool (value :: Bool) where
 -- | a. Write a singleton type for natural numbers:
 
 data SNat (value :: Nat) where
-  -- ...
+  SZ :: SNat 'Z
+  SS :: SNat  n -> SNat ('S n)
 
 -- | b. Write a function that extracts a vector's length at the type level:
 
 length :: Vector n a -> SNat n
-length = error "Implement me!"
+length VNil = SZ
+length (VCons _ v) = SS $ length v
 
 -- | c. Is 'Proxy' a singleton type?
 
 data Proxy a = Proxy
 
-
+-- We have many-to-one mapping, so no.
 
 
 
@@ -224,20 +235,28 @@ data Proxy a = Proxy
 -- and write to a file. To do this, we might write a data type to express our
 -- intentions:
 
-data Program                     result
-  = OpenFile            (Program result)
-  | WriteFile  String   (Program result)
-  | ReadFile  (String -> Program result)
-  | CloseFile (          Program result)
-  | Exit                         result
+data Program (isOpen :: Bool) result where
+  OpenFile  :: Program 'True result -> Program 'False result
+  WriteFile :: String -> Program 'True result -> Program 'True result
+  ReadFile  :: (String -> Program 'True result) -> Program 'True result
+  CloseFile :: Program 'False result -> Program 'True result
+  Exit      :: result -> Program 'False result
 
 -- | We could then write a program like this to use our language:
 
-myApp :: Program Bool
+-- This is one distorted exercice. The constructors are actually written
+-- backwards, because in myApp, they are used backwards, so that one can
+-- read them from left to write. Simply by subsituting & for $, we can write
+-- sane constructors with sane types, all-the-while reading from left to right
+
+-- Figured out that it's a way of writing continuations, but it is really hard
+-- to wrap my head around it fully for some reason
+
+myApp :: Program 'False Bool
 myApp
   = OpenFile $ WriteFile "HEY" $ (ReadFile $ \contents ->
       if contents == "WHAT"
-        then WriteFile "... bug?" $ Exit False
+        then WriteFile "... bug?" $ CloseFile $ Exit False
         else CloseFile            $ Exit True)
 
 -- | ... but wait, there's a bug! If the contents of the file equal "WHAT", we
@@ -263,11 +282,12 @@ myApp
 -- | EXTRA: write an interpreter for this program. Nothing to do with data
 -- kinds, but a nice little problem.
 
-interpret :: Program {- ??? -} a -> IO a
-interpret = error "Implement me?"
-
-
-
+interpret :: Program s a -> IO ()
+interpret (OpenFile    f) = print "Opening file!" >> interpret f
+interpret (WriteFile s f) = print ("Write: " ++ s) >> interpret f
+interpret (ReadFile    f) = print "Reading file!" >> interpret (f "WHAT")
+interpret (CloseFile   f) = print "Closing!"
+interpret (Exit        r) = print "Exiting with result"
 
 
 {- NINE -}
