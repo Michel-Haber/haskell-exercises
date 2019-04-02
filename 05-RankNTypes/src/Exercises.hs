@@ -2,9 +2,11 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE GADTs          #-}
 {-# LANGUAGE RankNTypes     #-}
+{-# LANGUAGE LambdaCase     #-}
 module Exercises where
 
 import Data.Kind (Type)
+import Data.Maybe
 
 
 
@@ -20,15 +22,18 @@ data Exlistential where
 
 -- | a. Write a function to "unpack" this exlistential into a list.
 
--- unpackExlistential :: Exlistential -> (forall a. a -> r) -> [r]
--- unpackExlistential = error "Implement me!"
+unpackExlistential :: Exlistential -> (forall a. a -> r) -> [r]
+unpackExlistential Nil        f = []
+unpackExlistential (Cons a l) f = f a:unpackExlistential l f
 
 -- | b. Regardless of which type @r@ actually is, what can we say about the
 -- values in the resulting list?
 
+-- The values in the resulting list have the same type
+
 -- | c. How do we "get back" knowledge about what's in the list? Can we?
 
-
+-- We cannot, they have already been transformed to the new type
 
 
 
@@ -42,14 +47,23 @@ data CanFold a where
 
 -- | a. The following function unpacks a 'CanFold'. What is its type?
 
--- unpackCanFold :: ???
--- unpackCanFold f (CanFold x) = f x
+-- Here we are basically saying:
+-- For any Foldable [container] f over a type x, our argument function can
+-- transform this f of x into some type y. Then we give it the Foldable over x
+-- and it returns the y.
+unpackCanFold :: (forall f. Foldable f => f x -> y) -> CanFold x -> y
+unpackCanFold fold (CanFold x) = fold x
 
 -- | b. Can we use 'unpackCanFold' to figure out if a 'CanFold' is "empty"?
 -- Could we write @length :: CanFold a -> Int@? If so, write it!
 
+length :: CanFold x -> Int
+length (CanFold xs) = foldr (\_ acc -> acc + 1) 0 xs
+
 -- | c. Write a 'Foldable' instance for 'CanFold'. Don't overthink it.
 
+instance Foldable CanFold where
+  foldMap tr (CanFold xs) = foldMap tr xs
 
 
 
@@ -64,14 +78,21 @@ data EqPair where
 -- | a. Write a function that "unpacks" an 'EqPair' by applying a user-supplied
 -- function to its pair of values in the existential type.
 
+unpackPair :: (forall a. Eq a => a -> a -> b) -> EqPair -> b
+unpackPair f (EqPair x y) = f x y
+
 -- | b. Write a function that takes a list of 'EqPair's and filters it
 -- according to some predicate on the unpacked values.
+
+filterPairList :: (forall a. Eq a => a -> a -> Bool) -> [EqPair] -> [EqPair]
+filterPairList f = filter (unpackPair f)
 
 -- | c. Write a function that unpacks /two/ 'EqPair's. Now that both our
 -- variables are in rank-2 position, can we compare values from different
 -- pairs?
 
-
+unpackTwice :: (forall a. Eq a => a -> a -> r) -> EqPair -> EqPair -> (r, r)
+unpackTwice f p q = (unpackPair f p, unpackPair f q)
 
 
 
@@ -97,13 +118,20 @@ data Nested input output subinput suboutput
 -- | a. Write a GADT to existentialise @subinput@ and @suboutput@.
 
 data NestedX input output where
-  -- ...
+  Nest :: Nested input output subinput suboutput -> NestedX input output
 
 -- | b. Write a function to "unpack" a NestedX. The user is going to have to
 -- deal with all possible @subinput@ and @suboutput@ types.
 
+unpackNested :: (forall si so. Nested i o si so -> r) -> NestedX i o -> r
+unpackNested f (Nest x) = f x
+
 -- | c. Why might we want to existentialise the subtypes away? What do we lose
 -- by doing so? What do we gain?
+
+-- We lose the ability to specify anything further about them.
+-- We gain code clarity. si and so don't really matter, as long as we can get
+-- to them. So we hide them.
 
 -- In case you're interested in where this actually turned up in the code:
 -- https://github.com/i-am-tom/purescript-panda/blob/master/src/Panda/Internal/Types.purs#L84
@@ -126,8 +154,10 @@ data FirstGo input output
 -- 'FText' /or/ 'FHTML'. Now that this is a sum type, they'd have to result in
 -- a 'Maybe'! Let's avoid this by splitting this sum type into separate types:
 
+
+-- Fixed HTML from solutions
 data Text = Text String
--- data HTML = HTML { properties :: (String, String), children :: ??? }
+data HTML = HTML { properties :: [(String, String)], children :: [Child] }
 
 -- | Uh oh! What's the type of our children? It could be either! In fact, it
 -- could probably be anything that implements the following class, allowing us
@@ -135,16 +165,21 @@ data Text = Text String
 class Renderable component where render :: component -> String
 
 -- | a. Write a type for the children.
+data Child where
+  Child :: (Renderable a) => a -> Child
 
 -- | b. What I'd really like to do when rendering is 'fmap' over the children
 -- with 'render'; what's stopping me? Fix it!
+--
+instance Renderable Child where
+  render (Child x) = render x
 
 -- | c. Now that we're an established Haskell shop, we would /also/ like the
 -- option to render our HTML to a Shakespeare template to write to a file
 -- (http://hackage.haskell.org/package/shakespeare). How could we support this
 -- new requirement with minimal code changes?
 
-
+-- Meh, not interested
 
 
 
@@ -161,10 +196,24 @@ data MysteryBox a where
 -- | a. Knowing what we now know about RankNTypes, we can write an 'unwrap'
 -- function! Write the function, and don't be too upset if we need a 'Maybe'.
 
+unwrap :: MysteryBox a -> (forall e. MysteryBox e -> r) -> Maybe r
+unwrap  EmptyBox        f = Nothing
+unwrap (IntBox    _ xs) f = Just $ f xs
+unwrap (StringBox _ xs) f = Just $ f xs
+unwrap (BoolBox   _ xs) f = Just $ f xs
+
 -- | b. Why do we need a 'Maybe'? What can we still not know?
+
+-- The empty box cannot be unwrapped.
 
 -- | c. Write a function that uses 'unwrap' to print the name of the next
 -- layer's constructor.
+
+printLayer :: MysteryBox a -> String
+printLayer mb = fromMaybe "No more layers" $ unwrap mb $ \case
+                  IntBox    _ _ -> "EmptyBox"
+                  StringBox _ _ -> "IntBox"
+                  BoolBox   _ _ -> "StringBox"
 
 
 
@@ -183,7 +232,8 @@ data SNat (n :: Nat) where
 -- | We also saw that we could convert from an 'SNat' to a 'Nat':
 
 toNat :: SNat n -> Nat
-toNat = error "You should already know this one ;)"
+toNat SZ     = Z
+toNat (SS n) = S $ toNat n
 
 -- | How do we go the other way, though? How do we turn a 'Nat' into an 'SNat'?
 -- In the general case, this is impossible: the 'Nat' could be calculated from
