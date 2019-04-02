@@ -7,7 +7,7 @@ module Exercises where
 
 import Data.Kind (Type, Constraint)
 import Data.Function ((&))
-import Prelude hiding (length)
+import Prelude hiding (length, (!!))
 
 
 
@@ -306,11 +306,18 @@ data Vector (n :: Nat) (a :: Type) where
 -- into Z and S cases. That's all the hint you need :)
 
 data SmallerThan (limit :: Nat) where
-  -- ...
+  SmallerThanZ :: SmallerThan ('S n)
+  SmallerThanS :: SmallerThan n -> SmallerThan ('S n)
+
 
 -- | b. Write the '(!!)' function:
 
 (!!) :: Vector n a -> SmallerThan n -> a
-(!!) = error "Implement me!"
+(!!) (VCons x _ )  SmallerThanZ    = x
+(!!) (VCons x xs) (SmallerThanS n) = (!!) xs n
 
 -- | c. Write a function that converts a @SmallerThan n@ into a 'Nat'.
+
+toNat :: SmallerThan n -> Nat
+toNat SmallerThanZ = Z
+toNat (SmallerThanS n) = S $ toNat n
