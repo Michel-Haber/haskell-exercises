@@ -232,7 +232,7 @@ data SNat (n :: Nat) where
 -- | We also saw that we could convert from an 'SNat' to a 'Nat':
 
 toNat :: SNat n -> Nat
-toNat SZ     = Z
+toNat  SZ    = Z
 toNat (SS n) = S $ toNat n
 
 -- | How do we go the other way, though? How do we turn a 'Nat' into an 'SNat'?
@@ -245,6 +245,18 @@ toNat (SS n) = S $ toNat n
 -- SNat-accepting function (maybe at a higher rank?) that returns an @r@, and
 -- then returns an @r@. The successor case is a bit weird here - type holes
 -- will help you!
+
+-- I noted that, although the function is defined as taking any SNat a and
+-- returning an r, (f SZ) MUST be of kind Nat. This limits the values of f
+-- to toNat and its sisters (that add a "const" or something). That is, (f SZ)
+-- being of kind Nat, it has to have the type 'Z or ('S n). One can extract the
+-- type 'Z from SZ with toNat, or another function mapping SNat to Nat.
+-- Now the reason (f SZ) is of kind Nat is that SS is always applied to it,
+-- and SS may only work with the Nat kind.
+
+fromNat :: Nat -> (forall a. SNat a -> r) -> r
+fromNat  Z    f = f SZ
+fromNat (S n) f = fromNat n (f . SS)
 
 -- | If you're looking for a property that you could use to test your function,
 -- remember that @fromNat x toNat === x@!
@@ -264,3 +276,12 @@ data Vector (n :: Nat) (a :: Type) where
 -- | It would be nice to have a 'filter' function for vectors, but there's a
 -- problem: we don't know at compile time what the new length of our vector
 -- will be... but has that ever stopped us? Make it so!
+
+-- So here, the function with the free type must either transform the Vector
+-- with the value, or without it. This amounts to not having to keep track of
+-- a "dynamic type value for n". We simply work around it.
+
+filterVec :: (a -> Bool) -> Vector n a -> (forall m. Vector m a -> r) -> r
+filterVec _  VNil        f = f VNil
+filterVec g (VCons x xs) f = filterVec g xs $ if g x then f . VCons x
+                                                     else f
