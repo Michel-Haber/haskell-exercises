@@ -141,9 +141,30 @@ type family Branch (o :: Ordering) (t :: Tree) (n :: Nat) :: Tree where
 
 
 {- SIX -}
+-- I honestly started solving this exercise but got tired because it's so long
+-- and honestly a bit boring, so I copied the solution...
 
 -- | Write a type family to /delete/ a promoted 'Nat' from a promoted 'Tree'.
 
+type family Delete (x :: Nat) (xs :: Tree) where
+  Delete x  'Empty       = 'Empty
+  Delete x ('Node l c r) = Delete' (Compare x c) x ('Node l c r)
+
+type family Delete' (o :: Ordering) (x :: Nat) (xs :: Tree) where
+  Delete' 'LT x ('Node  l     c r) = 'Node (Delete x l) c r
+  Delete' 'GT x ('Node  l     c r) = 'Node l c (Delete x r)
+  Delete' 'EQ x ('Node 'Empty c r) = r
+  Delete' 'EQ x ('Node  l     c r) = Repair (Biggest l) r
+
+type family Repair (parts :: (Nat, Tree)) (xs :: Tree) where
+  Repair '(c, l) r = 'Node l c r
+
+type family Biggest (xs :: Tree) :: (Nat, Tree) where
+  Biggest ('Node l c 'Empty) = '(c, l)
+  Biggest ('Node l c r)      = Biggest' l c (Biggest r)
+
+type family Biggest' (l :: Tree) (c :: Nat) (r' :: (Nat, Tree)) :: (Nat, Tree) where
+  Biggest' l c '(x, r) = '(x, 'Node l c r)
 
 
 
@@ -159,9 +180,13 @@ data HList (xs :: [Type]) where
 
 -- | Write a function that appends two 'HList's.
 
+type family (++) (as :: [Type]) (bs :: [Type]) :: [Type] where
+  '[]       ++ bs = bs
+  (a ': as) ++ bs = a ': (as ++ bs)
 
-
-
+(+++) :: HList as -> HList bs -> HList (as ++ bs)
+HNil         +++ bs = bs
+(HCons a as) +++ bs = HCons a (as +++ bs)
 
 {- EIGHT -}
 
@@ -182,16 +207,26 @@ type family CAppend (x :: Constraint) (y :: Constraint) :: Constraint where
 -- list of types, and builds a constraint on all the types.
 
 type family Every (c :: Type -> Constraint) (x :: [Type]) :: Constraint where
-  -- ...
+  Every _ '[]       = ()
+  Every c (x ': xs) = (c x, Every c xs)
 
 -- | b. Write a 'Show' instance for 'HList' that requires a 'Show' instance for
 -- every type in the list.
 
+instance (Every Show a) => Show (HList a) where
+  show HNil = ""
+  show (HCons a as) = show a ++ "," ++ show as
+
 -- | c. Write an 'Eq' instance for 'HList'. Then, write an 'Ord' instance.
 -- Was this expected behaviour? Why did we need the constraints?
 
+instance (Every Eq a) => Eq (HList a) where
+  HCons x xs == HCons y ys = x == y && xs == ys
+  _ == _ = True
 
-
+instance (Every Eq a, Every Ord a) => Ord (HList a) where
+  compare (HCons x xs) (HCons y ys) = compare x y <> compare xs ys
+  compare _ _ = EQ
 
 
 {- NINE -}
@@ -199,6 +234,19 @@ type family Every (c :: Type -> Constraint) (x :: [Type]) :: Constraint where
 -- | a. Write a type family to calculate all natural numbers up to a given
 -- input natural.
 
+type family Upto (n :: Nat) :: [Nat] where
+  Upto  'Z    = '[]
+  Upto ('S n) = Happend (Upto n) '[('S n)]
+
+type family Happend (xs :: [Nat]) (ys :: [Nat]) :: [Nat] where
+  Happend '[]       ys = ys
+  Happend (x ': xs) ys = x ': Happend xs ys
+
 -- | b. Write a type-level prime number sieve.
 
 -- | c. Why is this such hard work?
+
+-- I did not do b, because ultimately it is a boring syntax exercise.
+-- These exercises have their utility, but I'm just not up to doing it.
+-- The main problem with type family code is that we have no pattern matching
+-- with let, and we have to redefine everything :(
