@@ -16,7 +16,7 @@ import GHC.TypeLits (Symbol)
 
 -- | Let's look at the following type family to build a constraint:
 
-type family All (c :: Type -> Constraint) (xs :: [Type]) :: Constraint where
+type family All (c :: k -> Constraint) (xs :: [k]) :: Constraint where
   All c '[] = ()
   All c (x ': xs) = (c x, All c xs)
 
@@ -26,6 +26,7 @@ type family All (c :: Type -> Constraint) (xs :: [Type]) :: Constraint where
 -- | b. Why does it have to be restricted to 'Constraint'? Can you make this
 -- more general? Why is this harder?
 
+-- Because it is difficult to apply c to k and get j without knowing what j is.
 
 
 
@@ -60,9 +61,16 @@ f (Tagged x) = putStrLn (show x <> " is important!")
 
 -- | b. Can we generalise 'Type'? If so, how? If not, why not?
 
+-- This:
+-- data GTagged (name :: Symbol) (a :: k)
+--   = GTagged {runGTagged :: a}
+-- Is impossible, because Type is the only populated kind
+
 -- | c. Often when we use the 'Tagged' type, we prefer a sum type (promoted
 -- with @DataKinds@) over strings. Why do you think this might be?
 
+-- Using a Sum type means that we have a limited number of cases. Strings are
+-- unlimited
 
 
 
@@ -76,12 +84,20 @@ data a :=: b where
 
 -- | a. What do you think the kind of (:=:) is?
 
+-- Type -> Type -> Type
+
 -- | b. Does @PolyKinds@ make a difference to this kind?
+
+-- Refl is a type constructor => It's a value, so a :=: b has to be of type
+-- Type. a and b on the other hand are free to be of any kind
+-- So we'll have k -> k -> Type
 
 -- | c. Regardless of your answer to part (b), is this the most general kind we
 -- could possibly give this constructor? If not (hint: it's not), what more
 -- general kind could we give it, and how would we tell this to GHC?
 
+-- We can differentiate the kinds of a and b, but Refl must have both of the
+-- same kind, since they are of the same type.
 
 
 
