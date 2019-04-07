@@ -88,7 +88,7 @@ data a :=: b where
 
 -- | b. Does @PolyKinds@ make a difference to this kind?
 
--- Refl is a type constructor => It's a value, so a :=: b has to be of type
+-- Refl is a type constructor => Gives a value, so a :=: b has to be of type
 -- Type. a and b on the other hand are free to be of any kind
 -- So we'll have k -> k -> Type
 
@@ -124,7 +124,7 @@ data SBool (b :: Bool) where
   STrue  :: SBool 'True
   SFalse :: SBool 'False
 
--- type instance Sing ...
+type instance Sing x = SBool x
 
 -- | b. Repeat the process for the @Nat@ kind. Again, if you're on the right
 -- lines, this is very nearly a copy-paste job!
@@ -135,7 +135,7 @@ data SNat (n :: Nat) where
   SZ :: SNat 'Z
   SS :: SNat n -> SNat ('S n)
 
-
+type instance Sing x = SNat x
 
 
 
