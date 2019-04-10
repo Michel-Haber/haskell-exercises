@@ -156,19 +156,19 @@ data Strings (n :: Nat) where
 -- n@ and an @SNat n@ into @Sigma Strings@, existentialising the actual length.
 --
 -- @
---   example :: [Sigma Strings]
---   example
---     = [ Sigma         SZ   SNil
---       , Sigma     (SS SZ)  ("hi" :> SNil)
---       , Sigma (SS (SS SZ)) ("hello" :> ("world" :> SNil))
---       ]
+example :: [Sigma Strings]
+example
+  = [ Sigma         SZ   SNil
+    , Sigma     (SS SZ)  ("hi" :> SNil)
+    , Sigma (SS (SS SZ)) ("hello" :> ("world" :> SNil))
+    ]
 -- @
 
 -- | a. Write this type's definition: If you run the above example, the
 -- compiler should do a lot of the work for you...
 
-data Sigma (f :: Nat -> Type) where
-  -- Sigma :: ... -> Sigma f
+data Sigma (f :: k -> Type) where
+  Sigma :: Sing n -> f n -> Sigma f
 
 -- | b. Surely, by now, you've guessed this question? Why are we restricting
 -- ourselves to 'Nat'? Don't we have some more general way to talk about
