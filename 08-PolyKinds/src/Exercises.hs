@@ -182,8 +182,14 @@ data Vector (a :: Type) (n :: Nat) where -- @n@ and @a@ flipped... Hmm, a clue!
   VNil  ::                    Vector a  'Z
   VCons :: a -> Vector a n -> Vector a ('S n)
 
-
-
+filterV :: (a -> Bool) -> Vector a n -> Sigma (Vector a)
+filterV _ VNil = Sigma SZ VNil
+filterV f (VCons a as)
+  | f a = sig a (filterV f as)
+  | otherwise = filterV f as
+  where
+    sig :: a -> Sigma (Vector a) -> Sigma (Vector a)
+    sig v (Sigma sn vn) = Sigma (SS sn) (VCons v vn)
 
 
 
@@ -213,17 +219,30 @@ data ServerData
 -- server data.
 
 data Communication (label :: Label) where
-  -- {{Fill this space with your academic excellence}}
+  ClientSide :: ClientData -> Communication 'Client
+  ServerSide :: ServerData -> Communication 'Server
 
 -- | b. Write a singleton for 'Label'.
+
+data SLabel (label :: Label) where
+  SClient :: SLabel 'Client
+  SServer :: SLabel 'Server
+
+type instance Sing x = SLabel x
 
 -- | c. Magically, we can now group together blocks of data with differing
 -- labels using @Sigma Communication@, and then pattern-match on the 'Sigma'
 -- constructor to find out which packet we have! Try it:
 
--- serverLog :: [Sigma Communication] -> [ServerData]
--- serverLog = error "YOU CAN DO IT"
+serverLog :: [Sigma Communication] -> [ServerData]
+serverLog (Sigma SClient _ : xs) = serverLog xs
+serverLog (Sigma SServer (ServerSide x) : xs) = x : serverLog xs
 
 -- | d. Arguably, in this case, the Sigma type is overkill; what could we have
 -- done, perhaps using methods from previous chapters, to "hide" the label
 -- until we pattern-matched?
+
+-- We could simply have have hidden the label in the Communication type.
+-- I.E we create the time Communication' such that:
+-- ClientSide :: ClientData -> Communication
+-- ServerSide :: ServerData -> Communication
